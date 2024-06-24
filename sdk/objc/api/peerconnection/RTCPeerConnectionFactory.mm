@@ -268,15 +268,20 @@
         webrtc::CreateDefaultTaskQueueFactory(dependencies.trials.get());
    
     // always create ADM on worker thread
-    _nativeAudioDeviceModule = _workerThread->BlockingCall([&dependencies, &bypassVoiceProcessing]() {
-      return webrtc::AudioDeviceModule::Create(webrtc::AudioDeviceModule::AudioLayer::kPlatformDefaultAudio,
-                                               dependencies.task_queue_factory.get(),
-                                               bypassVoiceProcessing == YES);
-	  });
+      if (audioDeviceModule) {
+          _audioDeviceModule = std::move(audioDeviceModule);
+          dependencies.adm = _audioDeviceModule;
+      } else {
+          _nativeAudioDeviceModule = _workerThread->BlockingCall([&dependencies, &bypassVoiceProcessing]() {
+            return webrtc::AudioDeviceModule::Create(webrtc::AudioDeviceModule::AudioLayer::kPlatformDefaultAudio,
+                                                     dependencies.task_queue_factory.get(),
+                                                     bypassVoiceProcessing == YES);
+            });
 
-    _audioDeviceModule = [[RTC_OBJC_TYPE(RTCAudioDeviceModule) alloc] initWithNativeModule: _nativeAudioDeviceModule
-                                                       workerThread: _workerThread.get()];
-    dependencies.adm = _nativeAudioDeviceModule;
+          _audioDeviceModule = [[RTC_OBJC_TYPE(RTCAudioDeviceModule) alloc] initWithNativeModule: _nativeAudioDeviceModule
+                                                             workerThread: _workerThread.get()];
+          dependencies.adm = _nativeAudioDeviceModule;
+      }
     dependencies.audio_encoder_factory = std::move(audioEncoderFactory);
     dependencies.audio_decoder_factory = std::move(audioDecoderFactory);
     dependencies.video_encoder_factory = std::move(videoEncoderFactory);
